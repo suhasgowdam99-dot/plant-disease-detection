@@ -1,0 +1,38 @@
+	
+modelTopology	
+class_name	"Sequential"
+config	
+name	"sequential_4"
+layers	
+0	
+class_name	"Sequential"
+config	
+name	"sequential_1"
+layers	
+0	
+class_name	"Model"
+config	{ name: "model1", layers: (155)[…], input_layers: (1)[…], … }
+1	
+class_name	"GlobalAveragePooling2D"
+config	{ data_format: "channels_last", name: "global_average_pooling2d_GlobalAveragePooling2D1", trainable: true }
+1	
+class_name	"Sequential"
+config	
+name	"sequential_3"
+layers	
+0	
+class_name	"Dense"
+config	{ units: 100, activation: "relu", use_bias: true, … }
+1	
+class_name	"Dense"
+config	{ units: 9, activation: "softmax", use_bias: false, … }
+keras_version	"tfjs-layers 1.7.4"
+backend	"tensor_flow.js"
+weightsManifest	
+0	
+paths	
+0	"weights.bin"
+weights	
+[0…99]	
+[100…199]	
+[200…262]	
