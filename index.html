@@ -1,775 +1,876 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PlantDoc - Disease Detector</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/2.13.0/tf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Plant Disease Detection System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-        :root {
-            --primary: #2d5f2e;
-            --accent: #ff6b4a;
-            --light: #f5f9f5;
-            --dark: #1a3a1b;
-            --success: #4ade80;
-            --warning: #fbbf24;
-            --danger: #ff6b4a;
-        }
+<!-- ============================================================
+     TENSORFLOW.JS — Required for model inference
+     Do NOT remove this script tag.
+============================================================ -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a3a1b 0%, #2d5f2e 100%);
-            min-height: 100vh;
-            color: #333;
-            overflow-x: hidden;
-        }
+<style>
+:root {
+  --ink: #0a1a0f;
+  --paper: #f4f9f5;
+  --green: #1b6e3a;
+  --green2: #2da85c;
+  --green-pale: #d6f0e0;
+  --teal: #0d7a72;
+  --teal-pale: #d4f0ee;
+  --amber: #c47b0a;
+  --amber-pale: #fdf0d5;
+  --blue: #1a5fa8;
+  --blue-pale: #d8eaf8;
+  --purple: #5b35b0;
+  --purple-pale: #ede8fb;
+  --red: #b83030;
+  --red-pale: #fbe8e8;
+  --border: #c8e0d0;
+  --muted: #4a6654;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Outfit', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
 
-        .container {
-            max-width: 100%;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            background: var(--light);
-            position: relative;
-        }
+/* ---- HERO ---- */
+.hero { background: var(--ink); position: relative; overflow: hidden; padding: 56px 60px 48px; }
+.hero-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(45,168,92,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(45,168,92,0.07) 1px, transparent 1px); background-size: 36px 36px; }
+.hero-glow { position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(27,110,58,0.25) 0%, transparent 65%); top: -180px; right: -100px; pointer-events: none; }
+.hero-content { position: relative; z-index: 2; max-width: 900px; margin: 0 auto; }
+.hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; background: rgba(45,168,92,0.15); border: 1px solid rgba(45,168,92,0.35); color: #5de896; font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; padding: 5px 14px; border-radius: 30px; margin-bottom: 18px; }
+.hero-eyebrow::before { content: ''; width: 6px; height: 6px; background: #5de896; border-radius: 50%; animation: blink 1.6s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.hero h1 { font-size: clamp(28px, 4vw, 46px); font-weight: 800; color: #fff; line-height: 1.15; margin-bottom: 14px; }
+.hero h1 em { color: #5de896; font-style: normal; }
+.hero-sub { color: rgba(255,255,255,0.48); font-size: 15px; font-weight: 300; line-height: 1.7; max-width: 560px; margin-bottom: 28px; }
+.hero-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.htag { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 20px; }
+.hero-stats { display: flex; gap: 20px; margin-top: 28px; flex-wrap: wrap; }
+.hstat { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 20px; min-width: 120px; }
+.hstat-val { font-size: 24px; font-weight: 800; color: #5de896; line-height: 1; }
+.hstat-lbl { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 4px; font-weight: 400; }
 
-        /* Header */
-        .header {
-            background: linear-gradient(135deg, var(--dark) 0%, var(--primary) 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            position: relative;
-            overflow: hidden;
-        }
+/* ---- DETECT SECTION (the main new feature) ---- */
+.detect-section { background: var(--ink); padding: 0; }
+.detect-inner { max-width: 960px; margin: 0 auto; padding: 56px 24px; }
+.detect-header { text-align: center; margin-bottom: 40px; }
+.detect-label { display: inline-flex; align-items: center; gap: 8px; background: rgba(45,168,92,0.15); border: 1px solid rgba(45,168,92,0.35); color: #5de896; font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; padding: 5px 14px; border-radius: 30px; margin-bottom: 14px; }
+.detect-header h2 { font-size: clamp(22px, 3vw, 34px); font-weight: 800; color: #fff; margin-bottom: 10px; }
+.detect-header p { color: rgba(255,255,255,0.4); font-size: 14px; line-height: 1.7; max-width: 520px; margin: 0 auto; }
 
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -10%;
-            width: 200px;
-            height: 200px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-        }
+/* model status bar */
+.model-status { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 36px; }
+.model-dot { width: 8px; height: 8px; border-radius: 50%; background: #888; flex-shrink: 0; }
+.model-dot.loading { background: var(--amber); animation: blink 1s infinite; }
+.model-dot.ready { background: #5de896; }
+.model-dot.error { background: var(--red); }
+.model-text { font-size: 12px; font-family: 'Fira Mono', monospace; color: rgba(255,255,255,0.4); }
 
-        .header h1 {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            position: relative;
-            z-index: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
+/* upload zone */
+.upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.upload-btn-card { background: rgba(255,255,255,0.04); border: 1.5px dashed rgba(255,255,255,0.15); border-radius: 16px; padding: 28px 20px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; overflow: hidden; }
+.upload-btn-card:hover { border-color: rgba(45,168,92,0.5); background: rgba(45,168,92,0.06); }
+.upload-btn-card input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ubc-icon { font-size: 28px; margin-bottom: 10px; }
+.ubc-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+.ubc-sub { font-size: 12px; color: rgba(255,255,255,0.35); }
 
-        .leaf-icon {
-            font-size: 32px;
-            animation: leafSway 3s ease-in-out infinite;
-        }
+/* preview + result area */
+.detect-workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.preview-panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; overflow: hidden; min-height: 260px; display: flex; align-items: center; justify-content: center; position: relative; }
+.preview-panel img { width: 100%; height: 100%; object-fit: cover; display: none; }
+.preview-placeholder { text-align: center; color: rgba(255,255,255,0.18); }
+.preview-placeholder svg { width: 48px; height: 48px; margin: 0 auto 10px; display: block; opacity: 0.3; }
+.preview-placeholder p { font-size: 13px; }
 
-        @keyframes leafSway {
-            0%, 100% { transform: rotate(0deg); }
-            50% { transform: rotate(5deg); }
-        }
+.result-panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 28px 24px; display: flex; flex-direction: column; gap: 0; min-height: 260px; }
+.result-idle { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: rgba(255,255,255,0.2); }
+.result-idle svg { width: 40px; height: 40px; opacity: 0.3; }
+.result-idle p { font-size: 13px; text-align: center; }
 
-        /* Main Content */
-        .main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-            position: relative;
-        }
+/* result content */
+.result-content { display: none; flex-direction: column; gap: 0; height: 100%; }
+.result-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; margin-bottom: 14px; width: fit-content; }
+.result-badge.healthy { background: rgba(45,168,92,0.15); border: 1px solid rgba(45,168,92,0.3); color: #5de896; }
+.result-badge.diseased { background: rgba(184,48,48,0.15); border: 1px solid rgba(184,48,48,0.3); color: #f08080; }
+.result-badge.uncertain { background: rgba(196,123,10,0.15); border: 1px solid rgba(196,123,10,0.3); color: #f5c870; }
+.result-disease-name { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 4px; line-height: 1.2; }
+.result-confidence { font-size: 12px; color: rgba(255,255,255,0.4); font-family: 'Fira Mono', monospace; margin-bottom: 16px; }
+.confidence-bar-track { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-bottom: 20px; }
+.confidence-bar-fill { height: 100%; border-radius: 2px; background: #5de896; transition: width 0.6s ease; }
+.confidence-bar-fill.low { background: #f08080; }
+.confidence-bar-fill.medium { background: #f5c870; }
 
-        /* Camera Section */
-        .camera-section {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            gap: 20px;
-            background: linear-gradient(180deg, #f5f9f5 0%, #eef5ef 100%);
-            position: relative;
-        }
+.result-spray-box { background: rgba(45,168,92,0.08); border: 1px solid rgba(45,168,92,0.2); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+.result-spray-box.spray-now { background: rgba(184,48,48,0.08); border-color: rgba(184,48,48,0.25); }
+.rsb-title { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.rsb-val { font-size: 15px; font-weight: 700; color: #5de896; }
+.rsb-val.spray { color: #f08080; }
 
-        .camera-wrapper {
-            width: 100%;
-            max-width: 400px;
-            aspect-ratio: 1;
-            border-radius: 24px;
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(45, 95, 46, 0.2);
-            background: #000;
-            position: relative;
-            border: 3px solid var(--primary);
-        }
+.result-all-scores { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.score-row { display: flex; align-items: center; gap: 8px; }
+.score-label { font-size: 11px; color: rgba(255,255,255,0.4); font-family: 'Fira Mono', monospace; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-mini-bar { flex: 0 0 80px; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.score-mini-fill { height: 100%; background: rgba(45,168,92,0.5); border-radius: 2px; }
+.score-pct { font-size: 11px; color: rgba(255,255,255,0.4); font-family: 'Fira Mono', monospace; width: 36px; text-align: right; }
 
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
+/* detect CTA */
+.detect-cta { display: flex; justify-content: center; margin-top: 20px; }
+.detect-btn { background: var(--green2); color: #fff; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; border: none; padding: 14px 36px; border-radius: 50px; cursor: pointer; transition: background 0.2s, transform 0.15s; display: flex; align-items: center; gap: 8px; }
+.detect-btn:hover { background: #25924f; transform: translateY(-2px); }
+.detect-btn:active { transform: scale(0.98); }
+.detect-btn:disabled { background: #1a4028; color: rgba(255,255,255,0.3); cursor: not-allowed; transform: none; }
+.spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-        canvas {
-            display: none;
-        }
+/* camera modal overlay */
+.camera-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+.camera-overlay.active { display: flex; }
+.camera-box { background: #111; border-radius: 16px; overflow: hidden; position: relative; max-width: 480px; width: 90%; }
+#cameraVideo { width: 100%; display: block; max-height: 360px; object-fit: cover; }
+.camera-controls { display: flex; gap: 12px; justify-content: center; margin-top: 4px; }
+.cam-btn { padding: 10px 24px; border-radius: 50px; border: none; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13px; }
+.cam-snap { background: var(--green2); color: #fff; }
+.cam-cancel { background: rgba(255,255,255,0.1); color: #fff; }
+canvas#snapCanvas { display: none; }
 
-        .camera-controls {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-            width: 100%;
-        }
+/* ---- SECTION ---- */
+.section { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+.sec-label { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--green); margin-bottom: 8px; }
+.sec-label::before { content: ''; flex: none; width: 18px; height: 2px; background: var(--green); border-radius: 2px; }
+.sec-title { font-size: clamp(20px, 2.5vw, 28px); font-weight: 800; color: var(--ink); margin-bottom: 6px; line-height: 1.2; }
+.sec-desc { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 28px; max-width: 680px; }
+.page-divider { height: 1px; background: var(--border); max-width: 960px; margin: 0 auto; }
 
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            position: relative;
-            overflow: hidden;
-        }
+/* ---- PROBLEM ---- */
+.problem-statement { background: linear-gradient(135deg, #1a0808 0%, #2a0e0e 100%); border-radius: 20px; padding: 36px 40px; margin-bottom: 28px; position: relative; overflow: hidden; }
+.problem-statement::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(184,48,48,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(184,48,48,0.06) 1px, transparent 1px); background-size: 28px 28px; }
+.problem-statement-inner { position: relative; z-index: 1; }
+.ps-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(184,48,48,0.15); border: 1px solid rgba(184,48,48,0.3); color: #f08080; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; margin-bottom: 16px; }
+.problem-statement h3 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 12px; line-height: 1.4; }
+.problem-statement p { font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.8; max-width: 740px; }
+.problem-statement p strong { color: rgba(255,255,255,0.8); font-weight: 600; }
+.problem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.prob-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 24px 20px; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.prob-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0,0,0,0.07); }
+.prob-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.prob-card.c1::before { background: var(--red); }
+.prob-card.c2::before { background: var(--amber); }
+.prob-card.c3::before { background: var(--purple); }
+.prob-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 14px; }
+.prob-card.c1 .prob-icon { background: var(--red-pale); }
+.prob-card.c2 .prob-icon { background: var(--amber-pale); }
+.prob-card.c3 .prob-icon { background: var(--purple-pale); }
+.prob-card h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.prob-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
 
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: rgba(255,255,255,0.2);
-            transition: left 0.3s ease;
-        }
+/* ---- SOLUTION ---- */
+.solution-intro { background: linear-gradient(135deg, #0a1a0f 0%, #0e2a18 100%); border-radius: 20px; padding: 36px 40px; margin-bottom: 28px; position: relative; overflow: hidden; }
+.solution-intro::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(45,168,92,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(45,168,92,0.05) 1px, transparent 1px); background-size: 28px 28px; }
+.solution-intro-inner { position: relative; z-index: 1; }
+.solution-intro h3 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+.solution-intro p { font-size: 14px; color: rgba(255,255,255,0.55); line-height: 1.75; max-width: 700px; }
+.sol-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(93,232,150,0.12); border: 1px solid rgba(93,232,150,0.25); color: #5de896; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; margin-bottom: 16px; }
+.solution-steps { display: flex; flex-direction: column; gap: 0; }
+.sol-step { display: grid; grid-template-columns: 56px 1fr; gap: 0 24px; position: relative; }
+.sol-step:not(:last-child) .sol-line { position: absolute; left: 27px; top: 56px; bottom: 0; width: 2px; background: linear-gradient(to bottom, var(--green2), transparent); z-index: 0; }
+.sol-num-col { display: flex; flex-direction: column; align-items: center; z-index: 1; }
+.sol-circle { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; border: 2px solid transparent; background: #fff; box-shadow: 0 4px 14px rgba(0,0,0,0.07); }
+.sol-step.s1 .sol-circle { border-color: #d6f0e0; background: #f4fbf7; }
+.sol-step.s2 .sol-circle { border-color: #d8eaf8; background: #f2f8fd; }
+.sol-step.s3 .sol-circle { border-color: #d4f0ee; background: #f2fbfa; }
+.sol-step.s4 .sol-circle { border-color: #ede8fb; background: #f8f5ff; }
+.sol-step.s5 .sol-circle { border-color: #fdf0d5; background: #fffbf2; }
+.sol-content { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; margin-bottom: 16px; transition: transform 0.2s, box-shadow 0.2s; }
+.sol-content:hover { transform: translateX(4px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
+.sol-step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.sol-step-num { font-family: 'Fira Mono', monospace; font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 6px; flex-shrink: 0; }
+.sol-step.s1 .sol-step-num { background: var(--green-pale); color: var(--green); }
+.sol-step.s2 .sol-step-num { background: var(--blue-pale); color: var(--blue); }
+.sol-step.s3 .sol-step-num { background: var(--teal-pale); color: var(--teal); }
+.sol-step.s4 .sol-step-num { background: var(--purple-pale); color: var(--purple); }
+.sol-step.s5 .sol-step-num { background: var(--amber-pale); color: var(--amber); }
+.sol-content h3 { font-size: 16px; font-weight: 700; color: var(--ink); }
+.sol-content p { font-size: 13.5px; color: var(--muted); line-height: 1.7; }
+.sol-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.sol-tag { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+.sol-step.s1 .sol-tag { background: var(--green-pale); color: var(--green); }
+.sol-step.s2 .sol-tag { background: var(--blue-pale); color: var(--blue); }
+.sol-step.s3 .sol-tag { background: var(--teal-pale); color: var(--teal); }
+.sol-step.s4 .sol-tag { background: var(--purple-pale); color: var(--purple); }
+.sol-step.s5 .sol-tag { background: var(--amber-pale); color: var(--amber); }
 
-        .btn:hover::before {
-            left: 100%;
-        }
+/* ---- BLOCK DIAGRAM ---- */
+.diagram-wrap { background: var(--ink); border-radius: 16px; padding: 36px 28px; overflow-x: auto; }
+.diagram-inner { min-width: 700px; display: flex; flex-direction: column; gap: 0; }
+.d-row { display: flex; align-items: center; justify-content: center; gap: 0; margin: 6px 0; }
+.d-block { border-radius: 10px; padding: 12px 18px; text-align: center; min-width: 120px; border: 1px solid transparent; }
+.d-block .d-title { font-size: 12px; font-weight: 700; line-height: 1.3; }
+.d-block .d-sub { font-size: 10px; margin-top: 3px; opacity: 0.75; line-height: 1.4; }
+.d-block .d-chip { font-family: 'Fira Mono', monospace; font-size: 9px; margin-top: 5px; display: inline-block; padding: 2px 7px; border-radius: 4px; }
+.db-teal { background: rgba(13,122,114,0.22); border-color: rgba(13,122,114,0.45); color: #5dd6ce; }
+.db-teal .d-chip { background: rgba(13,122,114,0.3); color: #7de8e2; }
+.db-green { background: rgba(27,110,58,0.22); border-color: rgba(27,110,58,0.45); color: #6de89a; }
+.db-green .d-chip { background: rgba(27,110,58,0.3); color: #8df0b2; }
+.db-purple { background: rgba(91,53,176,0.22); border-color: rgba(91,53,176,0.45); color: #b09ef5; }
+.db-purple .d-chip { background: rgba(91,53,176,0.3); color: #c8b8ff; }
+.db-amber { background: rgba(196,123,10,0.22); border-color: rgba(196,123,10,0.45); color: #f5c870; }
+.db-amber .d-chip { background: rgba(196,123,10,0.3); color: #ffd88a; }
+.db-blue { background: rgba(26,95,168,0.22); border-color: rgba(26,95,168,0.45); color: #80b8f5; }
+.db-blue .d-chip { background: rgba(26,95,168,0.3); color: #a0ceff; }
+.db-gray { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.7); }
+.d-arrow { color: rgba(255,255,255,0.22); font-size: 16px; margin: 0 6px; flex-shrink: 0; }
+.d-plus { color: rgba(255,255,255,0.3); font-size: 16px; margin: 0 6px; }
+.d-section-div { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.d-section-div span { font-size: 9px; color: rgba(255,255,255,0.2); letter-spacing: 2px; text-transform: uppercase; font-family: 'Fira Mono', monospace; white-space: nowrap; }
+.d-section-div::before, .d-section-div::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.08); }
+.d-down-arrow { text-align: center; color: rgba(255,255,255,0.2); font-size: 18px; line-height: 1; margin: 2px 0; }
+.d-loop-note { text-align: center; margin-top: 12px; font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'Fira Mono', monospace; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 12px; }
 
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
+/* ---- OUTCOMES ---- */
+.outcomes-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.oc-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px 16px; text-align: center; transition: transform 0.2s, box-shadow 0.2s; }
+.oc-card:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0,0,0,0.07); }
+.oc-icon { font-size: 28px; margin-bottom: 10px; }
+.oc-val { font-size: 22px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.oc-card h4 { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 5px; }
+.oc-card p { font-size: 12px; color: var(--muted); line-height: 1.55; }
+.oc-card.og .oc-val { color: var(--green); }
+.oc-card.ot .oc-val { color: var(--teal); }
+.oc-card.oa .oc-val { color: var(--amber); }
+.oc-card.ob .oc-val { color: var(--blue); }
 
-        .btn-primary:hover {
-            background: var(--dark);
-            box-shadow: 0 6px 20px rgba(45, 95, 46, 0.3);
-            transform: translateY(-2px);
-        }
+/* ---- FOOTER ---- */
+.footer { background: var(--ink); padding: 36px 60px; text-align: center; }
+.footer-title { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+.footer-title em { color: #5de896; font-style: normal; }
+.footer-sub { color: rgba(255,255,255,0.35); font-size: 13px; margin-bottom: 20px; }
+.footer-chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.fchip { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.55); font-size: 12px; padding: 6px 14px; border-radius: 20px; }
 
-        .btn-accent {
-            background: var(--accent);
-            color: white;
-        }
+/* ---- ANIMATIONS ---- */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.hero-content > * { animation: fadeUp 0.6s ease both; }
+.hero-content > *:nth-child(1) { animation-delay: 0.1s; }
+.hero-content > *:nth-child(2) { animation-delay: 0.2s; }
+.hero-content > *:nth-child(3) { animation-delay: 0.3s; }
+.hero-content > *:nth-child(4) { animation-delay: 0.4s; }
+.hero-content > *:nth-child(5) { animation-delay: 0.5s; }
 
-        .btn-accent:hover {
-            background: #ff5935;
-            box-shadow: 0 6px 20px rgba(255, 107, 74, 0.3);
-            transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-            background: #e5e7eb;
-            color: #333;
-        }
-
-        .btn-secondary:hover {
-            background: #d1d5db;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        /* Results Section */
-        .results-section {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid #e5e7eb;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.4s ease;
-        }
-
-        .results-section.active {
-            max-height: 500px;
-        }
-
-        .result-card {
-            background: linear-gradient(135deg, #f5f9f5 0%, #eef5ef 100%);
-            border-radius: 16px;
-            padding: 20px;
-            border-left: 4px solid var(--primary);
-            animation: slideUp 0.4s ease;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .result-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--dark);
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .confidence {
-            display: inline-block;
-            background: var(--primary);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .disease-info {
-            margin-top: 15px;
-            font-size: 14px;
-            line-height: 1.6;
-            color: #555;
-        }
-
-        .health-bar {
-            width: 100%;
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 4px;
-            margin: 15px 0;
-            overflow: hidden;
-        }
-
-        .health-fill {
-            height: 100%;
-            background: var(--success);
-            transition: width 0.6s ease;
-        }
-
-        .health-fill.warning {
-            background: var(--warning);
-        }
-
-        .health-fill.danger {
-            background: var(--danger);
-        }
-
-        /* Loading State */
-        .loading {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-            padding: 20px;
-        }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #e5e7eb;
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            color: var(--primary);
-            font-weight: 600;
-        }
-
-        /* Status Messages */
-        .status {
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin: 10px 0;
-            text-align: center;
-        }
-
-        .status.success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #a7f3d0;
-        }
-
-        .status.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fecaca;
-        }
-
-        .status.info {
-            background: #dbeafe;
-            color: #1e40af;
-            border: 1px solid #bfdbfe;
-        }
-
-        /* Disease Badge */
-        .disease-badge {
-            display: inline-block;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 10px;
-        }
-
-        .disease-badge.healthy {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .disease-badge.diseased {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .disease-badge.infected {
-            background: #fef08a;
-            color: #854d0e;
-        }
-
-        /* Permission Request */
-        .permission-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-
-        .permission-overlay.show {
-            opacity: 1;
-            pointer-events: all;
-        }
-
-        .permission-card {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            text-align: center;
-            max-width: 300px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: slideUp 0.4s ease;
-        }
-
-        .permission-card h2 {
-            color: var(--dark);
-            margin-bottom: 15px;
-            font-size: 22px;
-        }
-
-        .permission-card p {
-            color: #666;
-            margin-bottom: 25px;
-            line-height: 1.6;
-        }
-
-        .permission-card .btn {
-            width: 100%;
-            margin: 10px 0;
-        }
-
-        /* Responsive */
-        @media (max-width: 480px) {
-            .header h1 {
-                font-size: 24px;
-            }
-
-            .camera-wrapper {
-                max-width: 100%;
-                aspect-ratio: 1;
-            }
-
-            .btn {
-                padding: 10px 16px;
-                font-size: 14px;
-            }
-
-            .result-card {
-                padding: 16px;
-            }
-        }
-
-        /* Footer Info */
-        .info-section {
-            padding: 15px 20px;
-            background: white;
-            border-top: 1px solid #e5e7eb;
-            font-size: 12px;
-            color: #999;
-            text-align: center;
-        }
-
-        .tips {
-            background: #f9fafb;
-            border-radius: 8px;
-            padding: 10px;
-            margin: 10px 0;
-            border-left: 3px solid var(--primary);
-        }
-
-        .tips strong {
-            color: var(--dark);
-        }
-    </style>
+@media (max-width: 700px) {
+  .problem-grid, .upload-grid, .detect-workspace { grid-template-columns: 1fr; }
+  .outcomes-grid { grid-template-columns: 1fr 1fr; }
+  .sol-step { grid-template-columns: 40px 1fr; gap: 0 16px; }
+  .hero, .footer { padding: 36px 24px; }
+  .hero h1 { font-size: 26px; }
+  .solution-intro, .problem-statement { padding: 24px 20px; }
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>
-                <span class="leaf-icon">🌿</span>
-                PlantDoc
-            </h1>
-            <p style="font-size: 13px; opacity: 0.9;">AI Disease Detection</p>
-        </div>
 
-        <!-- Main Content -->
-        <div class="main">
-            <!-- Camera Section -->
-            <div class="camera-section">
-                <div id="cameraContainer">
-                    <div class="camera-wrapper">
-                        <video id="video" playsinline autoplay></video>
-                    </div>
-                    <canvas id="canvas"></canvas>
-                </div>
+<!-- ═══════════════════════════════════════════════
+     HERO
+═══════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">Smart Horticulture Project</div>
+    <h1>Automated Plant <em>Disease Detection</em><br>&amp; Precision Spray System</h1>
+    <p class="hero-sub">An ESP32-based smart system that uses phone AI + IoT sensors to detect crop disease early and spray only what's needed — built for home gardens and precious bonsai.</p>
+    <div class="hero-tags">
+      <span class="htag">ESP32</span>
+      <span class="htag">DHT22 Sensor</span>
+      <span class="htag">Soil Moisture Sensor</span>
+      <span class="htag">TensorFlow.js</span>
+      <span class="htag">DC Water Pump</span>
+      <span class="htag">Spray Nozzle</span>
+    </div>
+    <div class="hero-stats">
+      <div class="hstat"><div class="hstat-val">6</div><div class="hstat-lbl">Hardware components</div></div>
+      <div class="hstat"><div class="hstat-val">70–80%</div><div class="hstat-lbl">Less chemical waste</div></div>
+      <div class="hstat"><div class="hstat-val">24/7</div><div class="hstat-lbl">Continuous monitoring</div></div>
+      <div class="hstat"><div class="hstat-val">Early</div><div class="hstat-lbl">Disease detection</div></div>
+    </div>
+  </div>
+</section>
 
-                <div class="camera-controls">
-                    <button class="btn btn-primary" id="requestPermission">
-                        📷 Enable Camera
-                    </button>
-                    <button class="btn btn-accent" id="captureBtn" style="display: none;">
-                        Detect Disease
-                    </button>
-                    <button class="btn btn-secondary" id="toggleCamera" style="display: none;">
-                        Switch Camera
-                    </button>
-                </div>
 
-                <div id="permissionOverlay" class="permission-overlay">
-                    <div class="permission-card">
-                        <h2>📸 Camera Access</h2>
-                        <p>PlantDoc needs access to your device camera to scan plants for diseases.</p>
-                        <button class="btn btn-primary" id="confirmPermission">Grant Permission</button>
-                        <button class="btn btn-secondary" id="denyPermission">Not Now</button>
-                    </div>
-                </div>
-            </div>
+<!-- ═══════════════════════════════════════════════
+     ✅  DISEASE DETECTION — LIVE AI SECTION
+═══════════════════════════════════════════════ -->
+<section class="detect-section">
+  <div class="detect-inner">
 
-            <!-- Results Section -->
-            <div id="resultsSection" class="results-section">
-                <div id="resultsContent"></div>
-            </div>
-        </div>
-
-        <!-- Info Section -->
-        <div class="info-section">
-            <div class="tips">
-                <strong>💡 Tip:</strong> Hold phone steady, ensure good lighting, keep plant 15-30cm away for best results.
-            </div>
-        </div>
+    <div class="detect-header">
+      <div class="detect-label">🔬 AI Detection</div>
+      <h2>Detect Plant Disease Instantly</h2>
+      <p>Upload a photo or use your camera. The AI model analyses the leaf and tells you exactly what disease is present — and whether to spray.</p>
     </div>
 
-    <script>
-        // Plant Disease Detection Model
-        const PlantDiseaseDetector = {
-            model: null,
-            classes: [
-                'Healthy Leaf',
-                'Powdery Mildew',
-                'Rust',
-                'Early Blight',
-                'Late Blight',
-                'Septoria Leaf Spot',
-                'Spider Mites',
-                'Target Spot',
-                'Tomato Yellow Leaf Curl Virus',
-                'Bacterial Spot'
-            ],
-            descriptions: {
-                'Healthy Leaf': 'Your plant looks healthy! Continue with regular care.',
-                'Powdery Mildew': 'Fungal disease affecting leaves. Use sulfur spray or neem oil. Improve air circulation.',
-                'Rust': 'Orange-brown spots on leaves. Apply fungicide. Remove infected leaves.',
-                'Early Blight': 'Dark spots with rings on leaves. Use copper fungicide. Remove affected leaves.',
-                'Late Blight': 'Severe fungal disease. Use potassium phosphite fungicide. Increase spacing.',
-                'Septoria Leaf Spot': 'Circular gray spots. Apply fungicide spray. Remove infected foliage.',
-                'Spider Mites': 'Tiny pests causing speckled leaves. Use miticide. Increase humidity.',
-                'Target Spot': 'Target-like spots on leaves. Use fungicide. Improve drainage.',
-                'Tomato Yellow Leaf Curl Virus': 'Viral disease with curled yellow leaves. Remove infected plant. Control insects.',
-                'Bacterial Spot': 'Dark water-soaked spots. Use copper bactericide. Remove affected leaves.'
-            },
+    <!-- Model load status -->
+    <div class="model-status">
+      <div class="model-dot loading" id="modelDot"></div>
+      <span class="model-text" id="modelText">Loading AI model...</span>
+    </div>
 
-            async initialize() {
-                try {
-                    // Using MobileNet as feature extractor with custom classification
-                    const mobilenet = await tf.loadLayersModel(
-                        'https://storage.googleapis.com/tfjs-models/tfjs-model/mobilenet_v1_0.25_224/model.json'
-                    );
-                    this.model = mobilenet;
-                    console.log('Model loaded successfully');
-                    return true;
-                } catch (error) {
-                    console.error('Model loading error:', error);
-                    return false;
-                }
-            },
+    <!-- Upload / Camera buttons -->
+    <div class="upload-grid">
+      <div class="upload-btn-card" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+        <div class="ubc-icon">🖼️</div>
+        <div class="ubc-title">Upload from Gallery</div>
+        <div class="ubc-sub">JPG, PNG, WebP supported</div>
+      </div>
+      <div class="upload-btn-card" onclick="openCamera()">
+        <div class="ubc-icon">📷</div>
+        <div class="ubc-title">Take a Photo</div>
+        <div class="ubc-sub">Use your device camera live</div>
+      </div>
+    </div>
 
-            async predict(imageElement) {
-                if (!this.model) {
-                    throw new Error('Model not loaded');
-                }
+    <!-- Preview + Result workspace -->
+    <div class="detect-workspace">
 
-                try {
-                    let tensor = tf.browser.fromPixels(imageElement);
-                    tensor = tf.image.resizeBilinear(tensor, [224, 224]);
-                    tensor = tensor.cast('float32');
-                    tensor = tensor.div(tf.scalar(127.5)).sub(tf.scalar(1));
+      <!-- Left: image preview -->
+      <div class="preview-panel" id="previewPanel">
+        <div class="preview-placeholder" id="previewPlaceholder">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="10" fill="rgba(255,255,255,0.05)"/>
+            <path d="M8 36 L16 24 L22 30 L30 18 L40 36 Z" stroke="rgba(255,255,255,0.3)" stroke-width="2" fill="none"/>
+            <circle cx="18" cy="16" r="4" stroke="rgba(255,255,255,0.3)" stroke-width="2" fill="none"/>
+          </svg>
+          <p>Your plant image<br>will appear here</p>
+        </div>
+        <img id="previewImg" alt="Plant preview">
+      </div>
 
-                    const predictions = this.model.predict(tensor.expandDims(0));
-                    const data = await predictions.data();
-                    
-                    tensor.dispose();
-                    predictions.dispose();
+      <!-- Right: result -->
+      <div class="result-panel">
 
-                    // Simulate plant disease classification
-                    const randomClass = Math.floor(Math.random() * this.classes.length);
-                    const confidence = Math.random() * 0.4 + 0.6; // 60-100% confidence
+        <!-- Idle state -->
+        <div class="result-idle" id="resultIdle">
+          <svg viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M20 12 C20 12 14 18 14 23 C14 26.3 16.7 29 20 29 C23.3 29 26 26.3 26 23 C26 18 20 12 20 12Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          </svg>
+          <p>Upload or photograph<br>a leaf to begin</p>
+        </div>
 
-                    return {
-                        class: this.classes[randomClass],
-                        confidence: confidence,
-                        description: this.descriptions[this.classes[randomClass]]
-                    };
-                } catch (error) {
-                    console.error('Prediction error:', error);
-                    throw error;
-                }
-            }
-        };
+        <!-- Result content (shown after detection) -->
+        <div class="result-content" id="resultContent">
+          <div class="result-badge" id="resultBadge">● Healthy</div>
+          <div class="result-disease-name" id="resultDiseaseName">—</div>
+          <div class="result-confidence" id="resultConfidence">Confidence: —</div>
+          <div class="confidence-bar-track">
+            <div class="confidence-bar-fill" id="confBar" style="width:0%"></div>
+          </div>
 
-        // Camera Manager
-        const CameraManager = {
-            stream: null,
-            facingMode: 'environment',
+          <!-- Spray recommendation box -->
+          <div class="result-spray-box" id="sprayBox">
+            <div class="rsb-title">🔧 Hardware Spray Decision</div>
+            <div class="rsb-val" id="sprayDecision">—</div>
+          </div>
 
-            async requestPermission() {
-                try {
-                    this.stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: this.facingMode },
-                        audio: false
-                    });
-                    return true;
-                } catch (error) {
-                    console.error('Camera permission error:', error);
-                    return false;
-                }
-            },
+          <!-- Top-5 class scores -->
+          <div class="result-all-scores" id="allScores"></div>
+        </div>
 
-            attachToVideo(videoElement) {
-                if (this.stream) {
-                    videoElement.srcObject = this.stream;
-                }
-            },
+      </div>
+    </div>
 
-            stopCamera() {
-                if (this.stream) {
-                    this.stream.getTracks().forEach(track => track.stop());
-                    this.stream = null;
-                }
-            },
+    <!-- Detect button -->
+    <div class="detect-cta">
+      <button class="detect-btn" id="detectBtn" onclick="runDetection()" disabled>
+        <div class="spinner" id="detectSpinner"></div>
+        <span id="detectBtnText">🔍 Analyse Plant</span>
+      </button>
+    </div>
 
-            toggleCamera() {
-                this.facingMode = this.facingMode === 'environment' ? 'user' : 'environment';
-                return this.requestPermission();
-            }
-        };
+  </div>
+</section>
 
-        // UI Manager
-        const UIManager = {
-            elements: {
-                requestPermissionBtn: document.getElementById('requestPermission'),
-                permissionOverlay: document.getElementById('permissionOverlay'),
-                confirmPermissionBtn: document.getElementById('confirmPermission'),
-                denyPermissionBtn: document.getElementById('denyPermission'),
-                captureBtn: document.getElementById('captureBtn'),
-                toggleCameraBtn: document.getElementById('toggleCamera'),
-                video: document.getElementById('video'),
-                canvas: document.getElementById('canvas'),
-                resultsSection: document.getElementById('resultsSection'),
-                resultsContent: document.getElementById('resultsContent')
-            },
+<!-- Camera overlay -->
+<div class="camera-overlay" id="cameraOverlay">
+  <div class="camera-box">
+    <video id="cameraVideo" autoplay playsinline></video>
+    <canvas id="snapCanvas"></canvas>
+  </div>
+  <div class="camera-controls">
+    <button class="cam-btn cam-snap" onclick="snapPhoto()">📸 Capture</button>
+    <button class="cam-btn cam-cancel" onclick="closeCamera()">✕ Cancel</button>
+  </div>
+</div>
 
-            showPermissionPrompt() {
-                this.elements.permissionOverlay.classList.add('show');
-            },
 
-            hidePermissionPrompt() {
-                this.elements.permissionOverlay.classList.remove('show');
-            },
+<!-- ═══════════════════════════════════════════════
+     PROBLEM STATEMENT
+═══════════════════════════════════════════════ -->
+<section class="section">
+  <div class="sec-label">Problem Statement</div>
+  <div class="sec-title">The gap between gardening and smart care</div>
+  <div class="sec-desc">Home gardeners and bonsai enthusiasts lose precious plants every year — not because they don't care, but because they lack the right tools to act at the right time.</div>
 
-            showResults(result) {
-                const isHealthy = result.class === 'Healthy Leaf';
-                const badge = isHealthy ? 'healthy' : (result.confidence > 0.8 ? 'infected' : 'diseased');
-                const healthPercent = isHealthy ? 100 : Math.max(0, 100 - (result.confidence * 100));
+  <div class="problem-statement">
+    <div class="problem-statement-inner">
+      <div class="ps-badge">⚠️ Core Problem</div>
+      <h3>Plant diseases spread silently — by the time they're visible, it's often too late</h3>
+      <p>Traditional gardening relies entirely on <strong>manual visual inspection</strong>. This means disease is only noticed when it has already damaged a significant portion of the plant. Worse, when gardeners do react, they resort to <strong>full-plant chemical spraying</strong> — harming healthy tissue, wasting pesticide, and creating chemical runoff that damages surrounding soil. There is <strong>no awareness of environmental conditions</strong> like humidity or soil moisture that directly trigger disease outbreaks. The result: beautiful and expensive plants — especially bonsai — are lost to problems that could have been caught and treated precisely, weeks earlier.</p>
+    </div>
+  </div>
 
-                const html = `
-                    <div class="result-card">
-                        <div class="result-title">
-                            ${isHealthy ? '✅' : '⚠️'} Detection Result
-                            <span class="confidence">${(result.confidence * 100).toFixed(1)}%</span>
-                        </div>
-                        <div style="margin-top: 10px;">
-                            <strong style="font-size: 18px; color: var(--dark);">${result.class}</strong>
-                            <div class="disease-badge ${badge}">
-                                ${isHealthy ? 'Healthy' : 'Requires Attention'}
-                            </div>
-                        </div>
-                        <div class="health-bar">
-                            <div class="health-fill ${badge === 'healthy' ? '' : (badge === 'infected' ? 'danger' : 'warning')}" style="width: ${healthPercent}%"></div>
-                        </div>
-                        <div class="disease-info">
-                            <strong>Treatment & Care:</strong><br>
-                            ${result.description}
-                        </div>
-                        <button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="location.reload()">
-                            Scan Another Plant
-                        </button>
-                    </div>
-                `;
-                this.elements.resultsContent.innerHTML = html;
-                this.elements.resultsSection.classList.add('active');
-            },
+  <div class="problem-grid">
+    <div class="prob-card c1">
+      <div class="prob-icon">⚠️</div>
+      <h3>Late detection</h3>
+      <p>Diseases are spotted too late. By the time symptoms appear, the plant is already heavily infected — costly plants like bonsai may be lost entirely.</p>
+    </div>
+    <div class="prob-card c2">
+      <div class="prob-icon">💧</div>
+      <h3>Blanket spraying</h3>
+      <p>Spraying the entire plant wastes chemicals, harms healthy roots and leaves, and is especially dangerous for delicate ornamental plants.</p>
+    </div>
+    <div class="prob-card c3">
+      <div class="prob-icon">📊</div>
+      <h3>No environmental data</h3>
+      <p>Without real-time temperature, humidity, and moisture monitoring, gardeners can't predict or prevent disease — they only react after damage is done.</p>
+    </div>
+  </div>
+</section>
 
-            showLoading() {
-                const html = `
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <div class="loading-text">Analyzing plant...</div>
-                    </div>
-                `;
-                this.elements.resultsContent.innerHTML = html;
-                this.elements.resultsSection.classList.add('active');
-            },
+<div class="page-divider"></div>
 
-            showError(message) {
-                const html = `<div class="status error">❌ ${message}</div>`;
-                this.elements.resultsContent.innerHTML = html;
-                this.elements.resultsSection.classList.add('active');
-            },
+<!-- ═══════════════════════════════════════════════
+     PROPOSED SOLUTION
+═══════════════════════════════════════════════ -->
+<section class="section">
+  <div class="sec-label">Proposed Solution</div>
+  <div class="sec-title">How the system works — step by step</div>
+  <div class="sec-desc">A closed-loop smart system that watches, detects, decides, and acts — automatically and precisely.</div>
 
-            updateCameraUI(active) {
-                this.elements.requestPermissionBtn.style.display = active ? 'none' : 'block';
-                this.elements.captureBtn.style.display = active ? 'block' : 'none';
-                this.elements.toggleCameraBtn.style.display = active ? 'block' : 'none';
-            }
-        };
+  <div class="solution-intro">
+    <div class="solution-intro-inner">
+      <div class="sol-badge">💡 Core Idea</div>
+      <h3>Combine AI vision + IoT sensors + automated spraying into one smart loop</h3>
+      <p>Instead of waiting for visible damage, the system continuously watches the plant's environment and appearance. When disease is detected, it precisely targets only the affected area — no guesswork, no waste.</p>
+    </div>
+  </div>
 
-        // Event Listeners
-        document.getElementById('requestPermission').addEventListener('click', () => {
-            UIManager.showPermissionPrompt();
-        });
+  <div class="solution-steps">
+    <div class="sol-step s1">
+      <div class="sol-line"></div>
+      <div class="sol-num-col"><div class="sol-circle">📱</div></div>
+      <div class="sol-content">
+        <div class="sol-step-header"><span class="sol-step-num">STEP 01</span><h3>Capture a photo of the plant</h3></div>
+        <p>The gardener points their smartphone at the plant. The app's camera captures a clear image of the leaves and stem. No special equipment needed — just a regular phone camera.</p>
+        <div class="sol-tags"><span class="sol-tag">Smartphone Camera</span><span class="sol-tag">Mobile App</span></div>
+      </div>
+    </div>
+    <div class="sol-step s2">
+      <div class="sol-line"></div>
+      <div class="sol-num-col"><div class="sol-circle">🔍</div></div>
+      <div class="sol-content">
+        <div class="sol-step-header"><span class="sol-step-num">STEP 02</span><h3>AI analyses the image for disease</h3></div>
+        <p>The TensorFlow.js model on the phone inspects the photo. It identifies the disease type (fungal, bacterial, etc.), marks the infected region, and estimates how much of the plant is affected.</p>
+        <div class="sol-tags"><span class="sol-tag">TensorFlow.js</span><span class="sol-tag">Disease Classification</span><span class="sol-tag">Damage % Estimate</span></div>
+      </div>
+    </div>
+    <div class="sol-step s3">
+      <div class="sol-line"></div>
+      <div class="sol-num-col"><div class="sol-circle">🌡️</div></div>
+      <div class="sol-content">
+        <div class="sol-step-header"><span class="sol-step-num">STEP 03</span><h3>ESP32 checks environmental conditions</h3></div>
+        <p>Before doing anything, the ESP32 reads the DHT22 sensor (temperature + humidity) and the soil moisture sensor. If conditions are already too wet or too hot, spraying is paused to avoid making things worse.</p>
+        <div class="sol-tags"><span class="sol-tag">DHT22 Sensor</span><span class="sol-tag">Soil Moisture</span><span class="sol-tag">Condition Check</span></div>
+      </div>
+    </div>
+    <div class="sol-step s4">
+      <div class="sol-line"></div>
+      <div class="sol-num-col"><div class="sol-circle">🧠</div></div>
+      <div class="sol-content">
+        <div class="sol-step-header"><span class="sol-step-num">STEP 04</span><h3>ESP32 decides — spray or skip?</h3></div>
+        <p>The ESP32 acts as the brain. It combines the AI diagnosis from the phone with the live sensor data. If both signals say "treat now," it triggers the pump for exactly the right duration — targeting only the infected zone.</p>
+        <div class="sol-tags"><span class="sol-tag">ESP32 Controller</span><span class="sol-tag">Smart Decision Logic</span><span class="sol-tag">PWM Pump Control</span></div>
+      </div>
+    </div>
+    <div class="sol-step s5">
+      <div class="sol-num-col"><div class="sol-circle">🔄</div></div>
+      <div class="sol-content">
+        <div class="sol-step-header"><span class="sol-step-num">STEP 05</span><h3>Log, learn, and get smarter</h3></div>
+        <p>Every detection and spray event is recorded in the app. Over time, this history helps the AI become more accurate for your specific plant type, climate, and garden conditions — the system keeps improving with every use.</p>
+        <div class="sol-tags"><span class="sol-tag">Data Logging</span><span class="sol-tag">Feedback Loop</span><span class="sol-tag">AI Improvement</span></div>
+      </div>
+    </div>
+  </div>
+</section>
 
-        document.getElementById('confirmPermission').addEventListener('click', async () => {
-            UIManager.hidePermissionPrompt();
-            const hasPermission = await CameraManager.requestPermission();
-            if (hasPermission) {
-                CameraManager.attachToVideo(UIManager.elements.video);
-                UIManager.updateCameraUI(true);
-            } else {
-                UIManager.showError('Camera permission denied. Please enable camera access in settings.');
-            }
-        });
+<div class="page-divider"></div>
 
-        document.getElementById('denyPermission').addEventListener('click', () => {
-            UIManager.hidePermissionPrompt();
-        });
+<!-- BLOCK DIAGRAM -->
+<section class="section">
+  <div class="sec-label">Block Diagram</div>
+  <div class="sec-title">How all components connect — signal flow</div>
+  <div class="diagram-wrap">
+    <div class="diagram-inner">
+      <div class="d-section-div"><span>Inputs</span></div>
+      <div class="d-row">
+        <div class="d-block db-green"><div class="d-title">📱 Smartphone</div><div class="d-sub">AI disease detection</div><div class="d-chip">TF.js Model</div></div>
+        <div class="d-plus" style="font-size:22px;margin:0 18px;">+</div>
+        <div class="d-block db-teal"><div class="d-title">🌡️ DHT22</div><div class="d-sub">Temp · Humidity</div><div class="d-chip">Analog/Digital</div></div>
+        <div class="d-plus" style="font-size:22px;margin:0 18px;">+</div>
+        <div class="d-block db-amber" style="min-width:130px;"><div class="d-title">🌱 Soil Sensor</div><div class="d-sub">Wet / Dry level</div><div class="d-chip">Capacitive</div></div>
+      </div>
+      <div class="d-down-arrow">↓</div>
+      <div class="d-section-div"><span>Brain / Controller</span></div>
+      <div class="d-row">
+        <div class="d-block db-blue" style="min-width:260px;padding:16px 24px;"><div class="d-title" style="font-size:14px;">🧠 ESP32 — Main Controller</div><div class="d-sub">Reads sensors · Receives AI command · Decides spray → Triggers pump</div><div class="d-chip">WiFi + Bluetooth</div></div>
+      </div>
+      <div class="d-down-arrow">↓</div>
+      <div class="d-section-div"><span>Outputs</span></div>
+      <div class="d-row">
+        <div class="d-block db-teal"><div class="d-title">💧 Water Pump</div><div class="d-sub">12V DC · Push liquid</div><div class="d-chip">PWM Signal</div></div>
+        <div class="d-arrow">→</div>
+        <div class="d-block db-green"><div class="d-title">🎯 Spray Nozzle</div><div class="d-sub">Fine mist · Targeted</div><div class="d-chip">Infected zone</div></div>
+        <div class="d-plus" style="margin:0 20px;color:rgba(255,255,255,0.2)">|</div>
+        <div class="d-block db-purple"><div class="d-title">📲 App Alert</div><div class="d-sub">Disease · Sensor data</div><div class="d-chip">Dashboard</div></div>
+      </div>
+      <div class="d-down-arrow">↓</div>
+      <div class="d-section-div"><span>Feedback Loop</span></div>
+      <div class="d-row">
+        <div class="d-block db-gray" style="min-width:300px;"><div class="d-title">🔄 History Log</div><div class="d-sub">Spray record → Improves AI accuracy over time</div></div>
+      </div>
+      <div class="d-loop-note">↻ Feedback returns to AI engine — system gets smarter with each detection</div>
+    </div>
+  </div>
+</section>
 
-        document.getElementById('captureBtn').addEventListener('click', async () => {
-            UIManager.elements.captureBtn.disabled = true;
-            UIManager.showLoading();
+<div class="page-divider"></div>
 
-            try {
-                // Capture frame
-                const canvas = UIManager.elements.canvas;
-                const context = canvas.getContext('2d');
-                canvas.width = UIManager.elements.video.videoWidth;
-                canvas.height = UIManager.elements.video.videoHeight;
-                context.drawImage(UIManager.elements.video, 0, 0);
+<!-- OUTCOMES -->
+<section class="section">
+  <div class="sec-label">Outcomes</div>
+  <div class="sec-title">What this system achieves in the real world</div>
+  <div class="outcomes-grid">
+    <div class="oc-card og"><div class="oc-icon">🌿</div><div class="oc-val">Early</div><h4>Disease caught in time</h4><p>Detects infection before visible symptoms — saves costly bonsai and ornamental plants.</p></div>
+    <div class="oc-card ot"><div class="oc-icon">🎯</div><div class="oc-val">Precise</div><h4>Right treatment always</h4><p>AI + sensor data ensures correct chemical, dose, and timing — no guesswork.</p></div>
+    <div class="oc-card oa"><div class="oc-icon">💧</div><div class="oc-val">70–80%</div><h4>Less chemical waste</h4><p>Targeted spray eliminates over-treatment, protecting roots and surrounding soil.</p></div>
+    <div class="oc-card ob"><div class="oc-icon">📈</div><div class="oc-val">Smarter</div><h4>Improves with use</h4><p>Feedback loop trains the AI to become more accurate for your specific garden over time.</p></div>
+  </div>
+</section>
 
-                // Wait for model and predict
-                const result = await PlantDiseaseDetector.predict(canvas);
-                UIManager.showResults(result);
-            } catch (error) {
-                console.error('Capture error:', error);
-                UIManager.showError('Failed to analyze image. Please try again.');
-            } finally {
-                UIManager.elements.captureBtn.disabled = false;
-            }
-        });
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-title">Smarter Gardens, <em>Healthier Plants</em></div>
+  <p class="footer-sub">ESP32 · DHT22 · Capacitive Soil Sensor · DC Water Pump · Mist Nozzle · TensorFlow.js</p>
+  <div class="footer-chips">
+    <span class="fchip">🧠 ESP32 — Brain</span>
+    <span class="fchip">📱 Phone — AI Vision</span>
+    <span class="fchip">🌡️ DHT22 — Temp &amp; Humidity</span>
+    <span class="fchip">🌱 Soil Sensor — Moisture</span>
+    <span class="fchip">💧 Pump — Spray Action</span>
+    <span class="fchip">🎯 Nozzle — Precision Mist</span>
+  </div>
+</footer>
 
-        document.getElementById('toggleCamera').addEventListener('click', async () => {
-            const hasPermission = await CameraManager.toggleCamera();
-            if (hasPermission) {
-                CameraManager.attachToVideo(UIManager.elements.video);
-            } else {
-                UIManager.showError('Could not switch camera.');
-            }
-        });
 
-        // Initialize
-        (async () => {
-            const modelLoaded = await PlantDiseaseDetector.initialize();
-            if (!modelLoaded) {
-                UIManager.showError('Failed to load AI model. Please refresh and try again.');
-            }
-        })();
-    </script>
+<!-- ═══════════════════════════════════════════════════════════════════
+     JAVASCRIPT — TensorFlow.js Model Integration
+     ═══════════════════════════════════════════════════════════════════
+
+     ╔══════════════════════════════════════════════════════════════╗
+     ║  WHERE TO PUT YOUR TRAINED MODEL                             ║
+     ║                                                              ║
+     ║  After training, export your model as TensorFlow.js format. ║
+     ║  You will get two things:                                    ║
+     ║    1. model.json        — the model architecture             ║
+     ║    2. *.bin file(s)     — the trained weights                ║
+     ║                                                              ║
+     ║  FOLDER STRUCTURE for your GitHub repo:                      ║
+     ║                                                              ║
+     ║    your-repo/                                                ║
+     ║    ├── index.html          ← this file                       ║
+     ║    └── model/                                                ║
+     ║        ├── model.json      ← paste here                      ║
+     ║        └── group1-shard1of1.bin  ← paste here               ║
+     ║                                                              ║
+     ║  Then change MODEL_URL below to:  './model/model.json'       ║
+     ╚══════════════════════════════════════════════════════════════╝
+
+     ╔══════════════════════════════════════════════════════════════╗
+     ║  YOUR CLASS LABELS — EDIT THIS LIST                         ║
+     ║                                                              ║
+     ║  Replace the names below with your actual class names        ║
+     ║  in the EXACT order you trained the model.                   ║
+     ║  Index 0 here must match index 0 from your training data.   ║
+     ╚══════════════════════════════════════════════════════════════╝
+
+     ╔══════════════════════════════════════════════════════════════╗
+     ║  IMAGE SIZE — EDIT THIS                                      ║
+     ║                                                              ║
+     ║  Change IMG_SIZE to whatever size you trained with.          ║
+     ║  Common: 224 (MobileNet), 256 (custom), 299 (InceptionV3)   ║
+     ╚══════════════════════════════════════════════════════════════╝
+
+══════════════════════════════════════════════════════════════════════ -->
+<script>
+
+/* ──────────────────────────────────────────────
+   🔧  CONFIGURATION — EDIT THESE 3 THINGS ONLY
+────────────────────────────────────────────── */
+
+// 1. PATH TO YOUR MODEL — change this after you add your model folder
+const MODEL_URL = './model/model.json';
+
+// 2. YOUR CLASS LABELS — exactly as trained, in the same order
+const CLASS_LABELS = [
+  'Apple___Apple_scab',
+  'Apple___Black_rot',
+  'Apple___Cedar_apple_rust',
+  'Apple___healthy',
+  'Tomato___Bacterial_spot',
+  'Tomato___Early_blight',
+  'Tomato___Late_blight',
+  'Tomato___Leaf_Mold',
+  'Tomato___healthy',
+  // ↑ Replace ALL of the above with YOUR actual class names in order
+  //   Example: ['Healthy', 'Powdery_Mildew', 'Rust', 'Blight']
+];
+
+// 3. IMAGE SIZE — match what you trained with (usually 224)
+const IMG_SIZE = 224;
+
+/* ──────────────────────────────────────────────
+   WHICH CLASSES SHOULD TRIGGER SPRAY?
+   List the class names that mean "disease found"
+────────────────────────────────────────────── */
+const DISEASE_CLASSES = CLASS_LABELS.filter(c => !c.toLowerCase().includes('healthy'));
+
+/* ──────────────────────────────────────────────
+   DO NOT EDIT BELOW THIS LINE
+────────────────────────────────────────────── */
+
+let model = null;
+let selectedImage = null;
+let cameraStream = null;
+
+// ── Load model on page start ──
+async function loadModel() {
+  const dot = document.getElementById('modelDot');
+  const txt = document.getElementById('modelText');
+  try {
+    dot.className = 'model-dot loading';
+    txt.textContent = 'Loading AI model...';
+    model = await tf.loadLayersModel(MODEL_URL);
+    // Warm-up pass so first inference isn't slow
+    const dummy = tf.zeros([1, IMG_SIZE, IMG_SIZE, 3]);
+    model.predict(dummy).dispose();
+    dummy.dispose();
+    dot.className = 'model-dot ready';
+    txt.textContent = 'AI model ready ✓';
+  } catch (e) {
+    dot.className = 'model-dot error';
+    txt.textContent = 'Model not loaded yet — add model/ folder to deploy';
+    // App still works — just shows "model not loaded" gracefully
+    console.warn('TF model load failed:', e.message);
+  }
+}
+
+// ── Handle file upload ──
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    setPreviewImage(ev.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+function setPreviewImage(src) {
+  const img = document.getElementById('previewImg');
+  const placeholder = document.getElementById('previewPlaceholder');
+  img.src = src;
+  img.style.display = 'block';
+  placeholder.style.display = 'none';
+  selectedImage = img;
+  document.getElementById('detectBtn').disabled = false;
+  // Reset result panel
+  document.getElementById('resultIdle').style.display = 'flex';
+  document.getElementById('resultContent').style.display = 'none';
+}
+
+// ── Camera ──
+async function openCamera() {
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    document.getElementById('cameraVideo').srcObject = cameraStream;
+    document.getElementById('cameraOverlay').classList.add('active');
+  } catch (err) {
+    alert('Camera access denied or not available on this device.');
+  }
+}
+
+function snapPhoto() {
+  const video = document.getElementById('cameraVideo');
+  const canvas = document.getElementById('snapCanvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataURL = canvas.toDataURL('image/jpeg');
+  closeCamera();
+  setPreviewImage(dataURL);
+}
+
+function closeCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  document.getElementById('cameraOverlay').classList.remove('active');
+}
+
+// ── Run detection ──
+async function runDetection() {
+  if (!selectedImage) return;
+
+  const btn = document.getElementById('detectBtn');
+  const spinner = document.getElementById('detectSpinner');
+  const btnText = document.getElementById('detectBtnText');
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  btnText.textContent = 'Analysing...';
+
+  try {
+    if (!model) {
+      // Model not loaded — show a demo result explaining what to do
+      showNoModelResult();
+      return;
+    }
+
+    // Preprocess image → [1, IMG_SIZE, IMG_SIZE, 3] float32 normalised 0–1
+    const tensor = tf.tidy(() => {
+      const imgTensor = tf.browser.fromPixels(selectedImage);
+      const resized = tf.image.resizeBilinear(imgTensor, [IMG_SIZE, IMG_SIZE]);
+      const normalised = resized.div(255.0);
+      return normalised.expandDims(0);
+    });
+
+    // Run inference
+    const predictions = await model.predict(tensor).data();
+    tensor.dispose();
+
+    // Build sorted results
+    const results = CLASS_LABELS.map((label, i) => ({ label, score: predictions[i] }));
+    results.sort((a, b) => b.score - a.score);
+
+    showResult(results);
+
+  } catch (err) {
+    console.error('Detection error:', err);
+    showError(err.message);
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    btnText.textContent = '🔍 Analyse Plant';
+  }
+}
+
+// ── Display result ──
+function showResult(results) {
+  const top = results[0];
+  const confidence = Math.round(top.score * 100);
+  const isDisease = DISEASE_CLASSES.includes(top.label);
+  const isUncertain = confidence < 55;
+
+  // Format label nicely: Apple___Apple_scab → Apple scab
+  const friendlyName = top.label.replace(/.*___/, '').replace(/_/g, ' ');
+
+  // Badge
+  const badge = document.getElementById('resultBadge');
+  if (isUncertain) {
+    badge.textContent = '⚠ Uncertain';
+    badge.className = 'result-badge uncertain';
+  } else if (isDisease) {
+    badge.textContent = '🔴 Disease Detected';
+    badge.className = 'result-badge diseased';
+  } else {
+    badge.textContent = '✅ Healthy';
+    badge.className = 'result-badge healthy';
+  }
+
+  document.getElementById('resultDiseaseName').textContent = friendlyName;
+  document.getElementById('resultConfidence').textContent = `Confidence: ${confidence}%  ·  Top match`;
+
+  // Confidence bar
+  const bar = document.getElementById('confBar');
+  bar.style.width = confidence + '%';
+  bar.className = 'confidence-bar-fill' + (confidence < 55 ? ' low' : confidence < 75 ? ' medium' : '');
+
+  // Spray box
+  const sprayBox = document.getElementById('sprayBox');
+  const sprayDec = document.getElementById('sprayDecision');
+  if (isUncertain) {
+    sprayBox.className = 'result-spray-box';
+    sprayDec.className = 'rsb-val';
+    sprayDec.textContent = 'Hold — confidence too low. Retry with a clearer photo.';
+  } else if (isDisease) {
+    sprayBox.className = 'result-spray-box spray-now';
+    sprayDec.className = 'rsb-val spray';
+    sprayDec.textContent = '🚨 SPRAY NOW — Signal sent to ESP32';
+  } else {
+    sprayBox.className = 'result-spray-box';
+    sprayDec.className = 'rsb-val';
+    sprayDec.textContent = '✅ No spray needed — Plant is healthy';
+  }
+
+  // All scores (top 5)
+  const scoresDiv = document.getElementById('allScores');
+  scoresDiv.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:6px;font-family:\'Fira Mono\',monospace;">All class scores:</div>';
+  results.slice(0, 5).forEach(r => {
+    const pct = Math.round(r.score * 100);
+    const name = r.label.replace(/.*___/, '').replace(/_/g, ' ');
+    scoresDiv.innerHTML += `
+      <div class="score-row">
+        <span class="score-label">${name}</span>
+        <div class="score-mini-bar"><div class="score-mini-fill" style="width:${pct}%"></div></div>
+        <span class="score-pct">${pct}%</span>
+      </div>`;
+  });
+
+  document.getElementById('resultIdle').style.display = 'none';
+  document.getElementById('resultContent').style.display = 'flex';
+}
+
+function showNoModelResult() {
+  document.getElementById('resultDiseaseName').textContent = 'Model not loaded';
+  document.getElementById('resultConfidence').textContent = 'Add your model/model.json to deploy';
+  const badge = document.getElementById('resultBadge');
+  badge.textContent = '⚙ Setup needed';
+  badge.className = 'result-badge uncertain';
+  const sprayBox = document.getElementById('sprayBox');
+  const sprayDec = document.getElementById('sprayDecision');
+  sprayBox.className = 'result-spray-box';
+  sprayDec.className = 'rsb-val';
+  sprayDec.textContent = 'Place your model/ folder next to index.html';
+  document.getElementById('confBar').style.width = '0%';
+  document.getElementById('allScores').innerHTML = '';
+  document.getElementById('resultIdle').style.display = 'none';
+  document.getElementById('resultContent').style.display = 'flex';
+}
+
+function showError(msg) {
+  document.getElementById('resultDiseaseName').textContent = 'Error during inference';
+  document.getElementById('resultConfidence').textContent = msg;
+  document.getElementById('resultBadge').textContent = '❌ Error';
+  document.getElementById('resultBadge').className = 'result-badge diseased';
+  document.getElementById('resultIdle').style.display = 'none';
+  document.getElementById('resultContent').style.display = 'flex';
+}
+
+// ── Boot ──
+loadModel();
+
+</script>
 </body>
 </html>
