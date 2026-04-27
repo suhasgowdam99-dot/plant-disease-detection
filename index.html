@@ -772,18 +772,18 @@ async function runDetection() {
       return normalised.expandDims(0);
     });
 
-    // Run inference
-    const if (predictions.length !== CLASS_LABELS.length) {   throw new Error(`Model output (${predictions.length}) does not match CLASS_LABELS (${CLASS_LABELS.length})`); }s = await model.predict(tensor).data();
-    tensor.dispose();
+// Run inference
+const predictions = await model.predict(tensor).data();
+tensor.dispose();
 
-    // ✅ ADD THIS CHECK HERE
+// ✅ Check AFTER predictions are created
 if (predictions.length !== CLASS_LABELS.length) {
   throw new Error(`Model output (${predictions.length}) does not match CLASS_LABELS (${CLASS_LABELS.length})`);
 }
-    // Build sorted results
-    const results = CLASS_LABELS.map((label, i) => ({ label, score: predictions[i] }));
-    results.sort((a, b) => b.score - a.score);
 
+// Build sorted results
+const results = CLASS_LABELS.map((label, i) => ({ label, score: predictions[i] }));
+results.sort((a, b) => b.score - a.score);
     showResult(results);
 
   } catch (err) {
