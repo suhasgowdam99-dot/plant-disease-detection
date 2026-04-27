@@ -646,8 +646,15 @@ const CLASS_LABELS = [
   'Yellowing',
   'Root Rot',
   'Pest Damage',
-  'Wilting'
+  'Wilting',
+  'Healthy' // ✅ must match training exactly
 ];
+
+// ✅ ADD THIS RIGHT HERE
+const HEALTHY_LABEL = 'Healthy';
+
+// ✅ REPLACE OLD FILTER WITH THIS
+const DISEASE_CLASSES = CLASS_LABELS.filter(c => c !== HEALTHY_LABEL);
 
 // 3. IMAGE SIZE — match what you trained with (usually 224)
 const IMG_SIZE = 224;
@@ -766,9 +773,13 @@ async function runDetection() {
     });
 
     // Run inference
-    const predictions = await model.predict(tensor).data();
+    const if (predictions.length !== CLASS_LABELS.length) {   throw new Error(`Model output (${predictions.length}) does not match CLASS_LABELS (${CLASS_LABELS.length})`); }s = await model.predict(tensor).data();
     tensor.dispose();
 
+    // ✅ ADD THIS CHECK HERE
+if (predictions.length !== CLASS_LABELS.length) {
+  throw new Error(`Model output (${predictions.length}) does not match CLASS_LABELS (${CLASS_LABELS.length})`);
+}
     // Build sorted results
     const results = CLASS_LABELS.map((label, i) => ({ label, score: predictions[i] }));
     results.sort((a, b) => b.score - a.score);
