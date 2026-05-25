@@ -290,8 +290,8 @@ canvas#snapCanvas { display: none; }
   <div class="hero-grid"></div>
   <div class="hero-glow"></div>
   <div class="hero-content">
-    <div class="hero-eyebrow">Smart Horticulture Project</div>
-    <h1>Automated Plant <em>Disease Detection</em><br>&amp; Precision Spray System</h1>
+    <div class="hero-eyebrow">From Team Agrisankalp </div>
+    <h1>Leafgaurd <em></h1>
     <p class="hero-sub">An ESP32-based smart system that uses phone AI + IoT sensors to detect crop disease early and spray only what's needed — built for home gardens and precious bonsai.</p>
     <div class="hero-tags">
       <span class="htag">ESP32</span>
@@ -309,7 +309,62 @@ canvas#snapCanvas { display: none; }
     </div>
   </div>
 </section>
+<script>/* ═══════════════════════════════════════════════
+   THINGSPEAK LIVE SENSOR FETCH
+═══════════════════════════════════════════════ */
 
+// ==========================================
+// 🔧 UPDATE THESE ONLY
+// ==========================================
+
+const THINGSPEAK_CHANNEL_ID = '3132304';
+
+const THINGSPEAK_READ_API_KEY = 'SIHPL0DF113P0NA2';
+
+// ==========================================
+// DO NOT EDIT BELOW
+// ==========================================
+
+async function fetchSensorData() {
+
+  try {
+
+    const response = await fetch(
+      `https://api.thingspeak.com/channels/${THINGSPEAK_CHANNEL_ID}/feeds/last.json?api_key=${THINGSPEAK_READ_API_KEY}`
+    );
+
+    const data = await response.json();
+
+    // Soil Moisture
+    document.getElementById('soilValue').textContent =
+      `${data.field1 || '--'}%`;
+
+    // Temperature
+    document.getElementById('tempValue').textContent =
+      `${data.field2 || '--'}°C`;
+
+    // Humidity
+    document.getElementById('humValue').textContent =
+      `${data.field3 || '--'}%`;
+
+    // Pump Status
+    const pumpState = data.field4;
+
+    document.getElementById('pumpValue').textContent =
+      pumpState == 1 ? 'ON' : 'OFF';
+
+  } catch (error) {
+
+    console.error('ThingSpeak Fetch Error:', error);
+
+  }
+}
+
+// Fetch immediately
+fetchSensorData();
+
+// Refresh every 5 seconds
+setInterval(fetchSensorData, 5000);</script>
 
 <!-- ═══════════════════════════════════════════════
      ✅  DISEASE DETECTION — LIVE AI SECTION
@@ -417,7 +472,48 @@ canvas#snapCanvas { display: none; }
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════
+     LIVE SENSOR MONITORING
+═══════════════════════════════════════════════ -->
+<section class="section">
+  <div class="sec-label">Live IoT Monitoring</div>
+  <div class="sec-title">Real-time Plant Environment Data</div>
+  <div class="sec-desc">
+    Live environmental data streamed from ESP32 using ThingSpeak cloud integration.
+  </div>
 
+  <div class="outcomes-grid">
+
+    <div class="oc-card og">
+      <div class="oc-icon">🌱</div>
+      <div class="oc-val" id="soilValue">--%</div>
+      <h4>Soil Moisture</h4>
+      <p>Real-time soil moisture from capacitive sensor.</p>
+    </div>
+
+    <div class="oc-card ot">
+      <div class="oc-icon">🌡️</div>
+      <div class="oc-val" id="tempValue">--°C</div>
+      <h4>Temperature</h4>
+      <p>Ambient temperature from DHT22 sensor.</p>
+    </div>
+
+    <div class="oc-card oa">
+      <div class="oc-icon">💧</div>
+      <div class="oc-val" id="humValue">--%</div>
+      <h4>Humidity</h4>
+      <p>Live atmospheric humidity monitoring.</p>
+    </div>
+
+    <div class="oc-card ob">
+      <div class="oc-icon">🚰</div>
+      <div class="oc-val" id="pumpValue">--</div>
+      <h4>Pump Status</h4>
+      <p>Automatic irrigation system state.</p>
+    </div>
+
+  </div>
+</section>
 <!-- ═══════════════════════════════════════════════
      PROBLEM STATEMENT
 ═══════════════════════════════════════════════ -->
@@ -573,6 +669,7 @@ canvas#snapCanvas { display: none; }
   </div>
 </section>
 
+
 <!-- FOOTER -->
 <footer class="footer">
   <div class="footer-title">Smarter Gardens, <em>Healthier Plants</em></div>
@@ -627,6 +724,8 @@ canvas#snapCanvas { display: none; }
      ╚══════════════════════════════════════════════════════════════╝
 
 ══════════════════════════════════════════════════════════════════════ -->
+
+
 <script>
 
 /* ──────────────────────────────────────────────
